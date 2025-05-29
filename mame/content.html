@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en" style="height:100%">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAMEACADE</title>
+  <link rel="prefetch" href="../mame/extractor-new.js" />
+  <link rel="prefetch" href="../mame/extractor-new.wasm" />
+  <style>
+    body {
+      font-family: Avenir, "Avenir Next", "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    @keyframes pulse {
+      from {}
+
+      to {
+        box-shadow: 1px 3px 15px 8px #222222,
+          0px 7px 10px 0px #111111,
+          inset 0px 0px 1px 0px rgba(250, 250, 250, 0.2),
+          inset 8px 5px 35px 0px rgba(0, 0, 0, 0.5);
+      }
+    }
+
+    #ejs-start-game {
+      display: flex;
+      justify-content: center;
+      text-shadow: 1px 1px 2px rgb(0 0 0);
+      font-size: 20px;
+      line-height: 45px;
+      text-transform: uppercase;
+      font-weight: bolder;
+      position: relative;
+      text-decoration: none;
+      width: 200px;
+      height: 45px;
+      border: 0;
+      color: #fff !important;
+      border-radius: 35px;
+      text-align: center;
+      background-color: rgb(26, 175, 255)
+    }
+
+    #ejs-start-game:hover {
+      animation: pulse 1.2s linear infinite alternate;
+    }
+
+    .frame-2 {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      z-index: 1;
+      transform: translate(-50%, -50%);
+    }
+
+    #disc-list a {
+      background: rgb(26, 175, 255);
+      display: block;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 0;
+      color: #fff;
+      text-decoration: none;
+    }
+    
+    .loader-container {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: transparent; /* 투명한 배경 */
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .loader-wrapper {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .loader {
+        border: 14px solid #f3f3f3;
+        border-top: 14px solid #ffb3b3;
+        border-radius: 50%;
+        width: 100px;
+        height: 100px;
+        animation: spin 2s linear infinite, colorChange 10s linear infinite;
+        box-shadow: 0 0 22px rgba(0, 0, 0, 0.3);
+    }
+
+    .loading-text {
+        font-size: 16px;
+        color: #c0d8cb;
+        font-weight: bold;
+        position: absolute;
+        text-align: center;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1;
+        animation: blinkText 1s infinite alternate;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    @keyframes colorChange {
+        0% { border-top-color: #ffb3b3; }
+        10% { border-top-color: #b3ffb3; }
+        20% { border-top-color: #b3d9ff; }
+        30% { border-top-color: #fff0b3; }
+        40% { border-top-color: #ffc0cb; }
+        50% { border-top-color: #f0e68c; }
+        60% { border-top-color: #d3d3d3; }
+        70% { border-top-color: #ffb6c1; }
+        80% { border-top-color: #e0ffff; }
+        90% { border-top-color: #f5deb3; }
+        100% { border-top-color: #ffb3b3; }
+    }
+
+    @keyframes blinkText {
+        0% { opacity: 0.2; }
+        100% { opacity: 1; }
+    }
+  </style>
+</head>
+
+<body style="border:none;margin:0;height: 100%;width: 100%;">
+  <div class style="height: 100%;">
+    <iframe id="game-frame" src="../mame/game.html" width="100%" height="100%" frameborder="no" allowtransparency="true"
+      allowfullscreen="true" webkitallowfullscreen="true" mozallowfullscreen="true" scrolling="no"></iframe>
+    <!--div class="frame-2">
+      <iframe src="ad.html?domain=" width="300px" height="250px" frameborder="no" scrolling="no"
+        sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts"></iframe>
+      <a href="#" class="ad-close"></a>
+    </div-->
+    <!-- 로딩 화면 -->
+    <div class="loader-container" id="loading" style="display:none; position: absolute;top: 60%; left: 50%; transform: translate(-50%, -50%);z-index: 1;">
+        <div class="loader-wrapper">
+            <div class="loader"></div>
+            <div class="loading-text">LOADING</div>
+        </div>
+    </div>
+    <div style="position: absolute;top: 50%; left: 50%; transform: translate(-50%, -50%);z-index: 1;"><a href="#"
+        id="ejs-start-game" style="display:none">START</a></div>
+    <div id="select-disc"
+      style="display:none;position: absolute;top: 50%;left: 50%;transform: translate(-50%, -50%);z-index: 1;background: rgb(64, 64, 64);max-width: 300px;color: #fff;min-width: 200px;text-align: center;font-weight: 700;">
+      <div style="padding:10px">
+        <h3>Select Disc</h3>
+        <ul id="disc-list" style="list-style: none;margin: 0;padding: 0;"></ul>
+      </div>
+    </div>
+  </div>
+  <script>
+    let gameFrameReady = false;
+    let initSent = false;
+    let gameFrame = document.querySelector('#game-frame');
+    let options = {};
+    let script = '';
+    let settings = {};
+    let url = '';
+    window.addEventListener('message', function (e) {
+      if (typeof e.data == 'object') {
+        if (e.data.act == 'ejs-setup' && e.source == window
+          .parent) {
+          options = e.data.options;
+          script = e.data.script;
+          settings = e.data.settings;
+          if (typeof settings == 'object') {
+            Object.keys(settings).forEach(function (k, i) {
+              try {
+                if (!localStorage.getItem(k) && settings[k]) {
+                  localStorage.setItem(k, settings[k]);
+                }
+              } catch (e) {}
+            });
+          }
+          if (options.color) {
+            document.querySelector('#ejs-start-game').style.backgroundColor = options.color;
+          }
+          if (gameFrameReady && !initSent) {
+            gameFrame.contentWindow.postMessage({
+              'act': 'ejs-game-init',
+              'options': options,
+              'script': script
+            }, '*');
+            initSent = true;
+          }
+        }
+        if (e.data.act == 'ejs-gameframe-ready' && e.source ==
+          gameFrame.contentWindow) {
+          gameFrameReady = true;
+          if (!initSent) {
+            gameFrame.contentWindow.postMessage({
+              'act': 'ejs-game-init',
+              'options': options,
+              'script': script
+            }, '*');
+            initSent = true;
+          }
+          //const loader = document.getElementById('loading');
+          //if (loader) loader.style.display = 'none';
+
+          document.querySelector('#ejs-start-game').style.display = 'none';
+          // START 버튼 표시 제거 → 자동 실행 추가          
+          setTimeout(() => {
+            gameFrame.contentWindow.postMessage({
+              'act': 'ejs-game-start'
+            }, '*');
+            if (document.querySelector('#ejs-start-game').remove) {
+              document.querySelector('#ejs-start-game').remove();
+            } else {
+              document.querySelector('#ejs-start-game').parentNode
+                .removeChild(document.querySelector('#ejs-start-game'));
+            }
+            const loader = document.getElementById('loading');
+            if (loader) loader.style.display = 'block';
+          }, 500);
+        }
+        if (e.data.act == 'ejs-game-started') {
+          if (e.source != gameFrame.contentWindow)
+            return false;
+
+            // 게임 시작 광고 삭제
+          //document.querySelector('.ad-close').style
+            //.display = "inline-block";
+          //document.querySelector('.ad-close').onclick =
+            //function () {
+              //document.querySelector(
+                //  '.frame-2')
+                //.style.display = 'none';
+              //return false;
+            //};
+          
+          const loader = document.getElementById('loading');
+          if (loader) loader.remove(); // 로딩 제거
+
+          window.parent.postMessage({
+            'act': 'ejs-game-started'
+          }, '*');
+          setTimeout(function () {
+            document.querySelector(
+                '.frame-2'
+              ).style
+              .display =
+              'none';
+          }, 1000);
+        }
+        if (e.data.act == 'ejs-enterfullscreen' && e.source ==
+          window.parent) {
+          gameFrame.contentWindow.postMessage({
+            'act': 'ejs-enterfullscreen'
+          }, '*');
+        }
+        if (e.data.act == 'ejs-exitfullscreen' && e.source ==
+          window.parent) {
+          gameFrame.contentWindow.postMessage({
+            'act': 'ejs-exitfullscreen'
+          }, '*');
+        }
+        if (e.data.act == 'ejs-idb-1' && e.source == window
+          .parent) {
+          gameFrame.contentWindow.postMessage({
+            'act': 'ejs-idb-1',
+            'path': e.data.path,
+            'data': e.data.data
+          }, '*');
+        }
+        if (e.data.act == 'ejs-ready-start' && e.source ==
+          window.parent) {
+          gameFrame.contentWindow.postMessage({
+            'act': 'ejs-ready-start',
+            'args': e.data.args
+          }, '*');
+        }
+      }
+    });
+    document.querySelector('#ejs-start-game').style.display = 'none';
+    window.parent.postMessage({
+      'act': 'ejs-ready'
+    }, '*');
+    document.querySelector('#ejs-start-game').onclick = function () {
+      gameFrame.contentWindow.postMessage({
+        'act': 'ejs-game-start'
+      }, '*');
+      if (document.querySelector('#ejs-start-game').remove) {
+        document.querySelector('#ejs-start-game').remove();
+      } else {
+        document.querySelector('#ejs-start-game').parentNode
+          .removeChild(document.querySelector('#ejs-start-game'));
+      }
+
+      /*gameFrame.gameFrame.contentWindow.postMessage({
+        'act': 'ejs-enterfullscreen'
+      }, '*');*/
+      
+      const loader = document.getElementById('loading');
+      if (loader) loader.style.display = 'block';
+      return false;
+    };
+  </script>
+</body>
+
+</html>
